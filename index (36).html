@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TopRacer</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --border: #2a2a32;
+    --accent: #e05c2a;
+    --accent2: #f0a030;
+    --text: #e8e8ec;
+    --muted: #6b6b7a;
+    --green: #39e07b;
+    --red: #e03939;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── HEADER ── */
+  #header { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  #header h1 { font-size: 1.3rem; letter-spacing: 4px; color: var(--accent); text-transform: uppercase; }
+  #playerInfo { font-size: 0.75rem; color: var(--muted); text-align: right; }
+  #playerInfo span { color: var(--text); font-weight: bold; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex: 1; overflow: hidden; }
+  .screen.active { display: flex; }
+
+  /* ── JOIN SCREEN ── */
+  #joinScreen { align-items: center; justify-content: center; flex-direction: column; gap: 18px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 32px 40px; display: flex; flex-direction: column; gap: 14px; min-width: 320px; }
+  .panel h2 { font-size: 1rem; letter-spacing: 3px; color: var(--accent2); text-transform: uppercase; margin-bottom: 6px; }
+  label { font-size: 0.72rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  input[type=text] { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 4px; font-family: inherit; font-size: 0.9rem; width: 100%; outline: none; transition: border-color .2s; }
+  input[type=text]:focus { border-color: var(--accent); }
+  .colorPicker { display: flex; gap: 8px; flex-wrap: wrap; }
+  .colorSwatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color .15s, transform .15s; }
+  .colorSwatch:hover { transform: scale(1.15); }
+  .colorSwatch.selected { border-color: white; }
+  button { background: var(--accent); color: white; border: none; padding: 11px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; transition: background .2s; }
+  button:hover { background: #c94d1e; }
+  button.secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+
+  /* ── LOBBY SCREEN ── */
+  #lobbyScreen { flex-direction: row; }
+  #lobbyLeft { width: 260px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); flex-shrink: 0; }
+  #lobbyTitle { padding: 16px; border-bottom: 1px solid var(--border); font-size: 0.7rem; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; }
+  #playerList { flex: 1; overflow-y: auto; padding: 8px; }
+  .playerRow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; margin-bottom: 4px; }
+  .playerRow.ready { background: rgba(57,224,123,0.08); }
+  .carDot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .playerName { font-size: 0.85rem; flex: 1; }
+  .playerElo { font-size: 0.7rem; color: var(--muted); }
+  .readyBadge { font-size: 0.6rem; color: var(--green); letter-spacing: 1px; }
+  #lobbyRight { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 32px; }
+  #trackPreview { width: 100%; max-width: 600px; height: 360px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; position: relative; overflow: hidden; }
+  #trackPreviewCanvas { width: 100%; height: 100%; }
+  #trackInfo { text-align: center; }
+  #trackName { font-size: 1.4rem; letter-spacing: 3px; text-transform: uppercase; }
+  #trackMeta { font-size: 0.72rem; color: var(--muted); margin-top: 6px; letter-spacing: 1px; }
+  #lobbyStatus { font-size: 0.75rem; color: var(--accent2); letter-spacing: 2px; text-transform: uppercase; }
+  #countdownDisplay { font-size: 3rem; color: var(--accent); font-weight: bold; display: none; }
+  #readyBtn { min-width: 180px; }
+  #rotateTimer { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; }
+
+  /* ── RACE SCREEN ── */
+  #raceScreen { position: relative; flex-direction: column; background: #0a0a0c; }
+  #raceCanvas { flex: 1; display: block; width: 100%; }
+  #raceHUD { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .hudBox { background: rgba(13,13,15,0.82); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; font-size: 0.72rem; letter-spacing: 1px; }
+  #lapDisplay { font-size: 1.2rem; color: var(--accent2); font-weight: bold; }
+  #posDisplay { font-size: 1.2rem; color: var(--text); }
+  #leaderboard { position: absolute; top: 12px; right: 12px; width: 200px; background: rgba(13,13,15,0.82); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-size: 0.7rem; }
+  .lbRow { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .lbPos { color: var(--muted); width: 16px; }
+  .lbName { flex: 1; }
+  .lbLap { color: var(--muted); font-size: 0.65rem; }
+  #dnfBanner { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(224,57,57,0.95); color: white; padding: 24px 48px; border-radius: 6px; font-size: 2rem; letter-spacing: 4px; text-transform: uppercase; z-index: 10; }
+
+  /* ── RESULTS SCREEN ── */
+  #resultsScreen { align-items: center; justify-content: center; flex-direction: column; gap: 20px; padding: 30px; }
+  #resultsScreen h2 { font-size: 1rem; letter-spacing: 4px; color: var(--accent); text-transform: uppercase; }
+  #resultsList { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 6px; }
+  .resultRow { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; }
+  .resultPos { font-size: 1.2rem; color: var(--accent2); width: 28px; font-weight: bold; }
+  .resultName { flex: 1; font-size: 0.9rem; }
+  .resultElo { font-size: 0.75rem; }
+  .eloUp { color: var(--green); }
+  .eloDown { color: var(--red); }
+  .dnfTag { font-size: 0.65rem; color: var(--red); letter-spacing: 1px; background: rgba(224,57,57,0.15); padding: 2px 6px; border-radius: 3px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>TopRacer</h1>
+  <div id="playerInfo">Not connected</div>
+</div>
+
+<!-- JOIN -->
+<div id="joinScreen" class="screen active">
+  <div class="panel">
+    <h2>Join Race</h2>
+    <div><label>Driver Name</label><input id="nameInput" type="text" maxlength="16" placeholder="YourName"/></div>
+    <div>
+      <label>Car Colour</label>
+      <div class="colorPicker" id="colorPicker"></div>
+    </div>
+    <button id="joinBtn">Join Game</button>
+  </div>
+</div>
+
+<!-- LOBBY -->
+<div id="lobbyScreen" class="screen">
+  <div id="lobbyLeft">
+    <div id="lobbyTitle">Drivers (<span id="lobbyCount">0</span>/32)</div>
+    <div id="playerList"></div>
+  </div>
+  <div id="lobbyRight">
+    <div id="trackPreview"><canvas id="trackPreviewCanvas"></canvas></div>
+    <div id="trackInfo">
+      <div id="trackName">—</div>
+      <div id="trackMeta">—</div>
+    </div>
+    <div id="rotateTimer"></div>
+    <div id="lobbyStatus">Waiting for players…</div>
+    <div id="countdownDisplay"></div>
+    <button id="readyBtn">Ready Up</button>
+  </div>
+</div>
+
+<!-- RACE -->
+<div id="raceScreen" class="screen">
+  <canvas id="raceCanvas"></canvas>
+  <div id="raceHUD">
+    <div class="hudBox"><div id="lapDisplay">LAP 1/1</div></div>
+    <div class="hudBox"><div id="posDisplay">POS —</div></div>
+  </div>
+  <div id="leaderboard"><div style="font-size:.65rem;color:var(--muted);letter-spacing:1px;margin-bottom:6px;">STANDINGS</div><div id="lbRows"></div></div>
+  <div id="dnfBanner">DNF</div>
+</div>
+
+<!-- RESULTS -->
+<div id="resultsScreen" class="screen">
+  <h2>Race Over</h2>
+  <div id="resultsList"></div>
+  <button id="backLobbyBtn">Back to Lobby</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CONSTANTS & CONFIG
+// ═══════════════════════════════════════════════════════════════════════════════
+const COLORS = ["#e05c2a","#f0a030","#39e07b","#39a0e0","#7b39e0","#e03980","#ffffff","#e0d039"];
+const TRACK_W = 1200, TRACK_H = 800;
+const CAR_W = 18, CAR_H = 30;
+const WALL_HALF = 38; // half-width of track corridor
+const SPEED_MAX = 4.5;
+const ACCEL     = 0.13;
+const FRICTION  = 0.97;
+const STEER     = 0.045;
+
+const CAR_COLORS = {};     // id -> color
+const carStates  = {};     // id -> { x, y, angle, speed }
+let myId, myColor = COLORS[0], myName = "Driver";
+let currentTrack = null;
+let myState = { x: 200, y: 400, angle: 0, speed: 0 };
+let myLap = 0, myCheckpoint = 0;
+let raceActive = false, myDNF = false, myFinished = false;
+let racers = [];
+let progress = {}; // id -> { laps, checkpoint }
+let keys = {};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function buildColorPicker() {
+  const cp = document.getElementById('colorPicker');
+  COLORS.forEach((c, i) => {
+    const sw = document.createElement('div');
+    sw.className = 'colorSwatch' + (i === 0 ? ' selected' : '');
+    sw.style.background = c;
+    sw.onclick = () => {
+      document.querySelectorAll('.colorSwatch').forEach(s => s.classList.remove('selected'));
+      sw.classList.add('selected');
+      myColor = c;
+    };
+    cp.appendChild(sw);
+  });
+}
+
+function updatePlayerInfo() {
+  const el = document.getElementById('playerInfo');
+  if (!myId || !socket.connected) { el.textContent = 'Not connected'; return; }
+  // player info updated from server on ELO changes
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  TRACK PREVIEW CANVAS
+// ═══════════════════════════════════════════════════════════════════════════════
+function drawTrackPreview(track) {
+  const canvas = document.getElementById('trackPreviewCanvas');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width  || 600;
+  canvas.height = rect.height || 360;
+  const ctx = canvas.getContext('2d');
+  const scaleX = canvas.width  / TRACK_W;
+  const scaleY = canvas.height / TRACK_H;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const pts = track.waypoints.map(([x, y]) => [x * scaleX, y * scaleY]);
+
+  // outer glow
+  ctx.shadowColor = track.color;
+  ctx.shadowBlur  = 18;
+
+  ctx.strokeStyle = track.color;
+  ctx.lineWidth   = WALL_HALF * 2 * Math.min(scaleX, scaleY);
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.stroke();
+
+  ctx.shadowBlur  = 0;
+  ctx.strokeStyle = '#0d0d0f';
+  ctx.lineWidth   = (WALL_HALF * 2 - 10) * Math.min(scaleX, scaleY);
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.stroke();
+
+  // start line
+  const [sx, sy] = pts[0];
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  ctx.moveTo(sx - 16, sy);
+  ctx.lineTo(sx + 16, sy);
+  ctx.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  RACE CANVAS
+// ═══════════════════════════════════════════════════════════════════════════════
+const raceCanvas = document.getElementById('raceCanvas');
+const rctx = raceCanvas.getContext('2d');
+
+function resizeRaceCanvas() {
+  raceCanvas.width  = raceCanvas.offsetWidth;
+  raceCanvas.height = raceCanvas.offsetHeight;
+}
+window.addEventListener('resize', resizeRaceCanvas);
+
+function worldToScreen(wx, wy, camX, camY, cw, ch) {
+  const scale = Math.min(cw / TRACK_W, ch / TRACK_H) * 1.1;
+  const ox = cw / 2 - camX * scale;
+  const oy = ch / 2 - camY * scale;
+  return [wx * scale + ox, wy * scale + oy, scale];
+}
+
+function drawCar(ctx, x, y, angle, color, scale) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  const w = CAR_W * scale, h = CAR_H * scale;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(-w/2, -h/2, w, h, w * 0.3);
+  ctx.fill();
+  // windscreen
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(-w*0.3, -h*0.3, w*0.6, h*0.25);
+  ctx.restore();
+}
+
+function drawTrackOnRace(ctx, track, camX, camY, cw, ch) {
+  const pts = track.waypoints.map(([x, y]) => {
+    const [sx, sy, scale] = worldToScreen(x, y, camX, camY, cw, ch);
+    return [sx, sy, scale];
+  });
+  const scale = pts[0][2];
+
+  // road surface
+  ctx.shadowColor = track.color + '55';
+  ctx.shadowBlur  = 28;
+  ctx.strokeStyle = '#1e1e26';
+  ctx.lineWidth   = WALL_HALF * 2 * scale;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.stroke();
+
+  // kerb
+  ctx.shadowBlur  = 0;
+  ctx.strokeStyle = track.color + '55';
+  ctx.lineWidth   = 4 * scale;
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.stroke();
+
+  // centre dashes
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth   = 1.5 * scale;
+  ctx.setLineDash([20 * scale, 20 * scale]);
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // start/finish line
+  const [x0, y0] = pts[0];
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = 3 * scale;
+  ctx.beginPath();
+  ctx.moveTo(x0 - 24 * scale, y0);
+  ctx.lineTo(x0 + 24 * scale, y0);
+  ctx.stroke();
+}
+
+function gameLoop() {
+  if (!raceActive) { requestAnimationFrame(gameLoop); return; }
+
+  const cw = raceCanvas.width, ch = raceCanvas.height;
+  rctx.clearRect(0, 0, cw, ch);
+  rctx.fillStyle = '#0a0a0c';
+  rctx.fillRect(0, 0, cw, ch);
+
+  if (!currentTrack) { requestAnimationFrame(gameLoop); return; }
+
+  // ── PHYSICS (player car only) ──
+  if (!myDNF && !myFinished) {
+    const up    = keys['ArrowUp']    || keys['w'] || keys['W'];
+    const down  = keys['ArrowDown']  || keys['s'] || keys['S'];
+    const left  = keys['ArrowLeft']  || keys['a'] || keys['A'];
+    const right = keys['ArrowRight'] || keys['d'] || keys['D'];
+
+    if (up)    myState.speed = Math.min(SPEED_MAX, myState.speed + ACCEL);
+    if (down)  myState.speed = Math.max(-SPEED_MAX * 0.5, myState.speed - ACCEL);
+    myState.speed *= FRICTION;
+
+    if (Math.abs(myState.speed) > 0.05) {
+      if (left)  myState.angle -= STEER * Math.sign(myState.speed);
+      if (right) myState.angle += STEER * Math.sign(myState.speed);
+    }
+
+    myState.x += Math.sin(myState.angle) * myState.speed;
+    myState.y -= Math.cos(myState.angle) * myState.speed;
+
+    // clamp to world
+    myState.x = Math.max(0, Math.min(TRACK_W, myState.x));
+    myState.y = Math.max(0, Math.min(TRACK_H, myState.y));
+
+    // ── CHECKPOINT DETECTION ──
+    checkCheckpoints();
+
+    // send update
+    socket.emit('carUpdate', { x: myState.x, y: myState.y, angle: myState.angle, speed: myState.speed });
+  }
+
+  // ── CAMERA follows player ──
+  const camX = myState.x, camY = myState.y;
+
+  // ── DRAW TRACK ──
+  drawTrackOnRace(rctx, currentTrack, camX, camY, cw, ch);
+
+  // ── DRAW OTHER CARS ──
+  Object.entries(carStates).forEach(([id, st]) => {
+    const [sx, sy, scale] = worldToScreen(st.x, st.y, camX, camY, cw, ch);
+    drawCar(rctx, sx, sy, st.angle, CAR_COLORS[id] || '#888', scale);
+    // name tag
+    rctx.fillStyle = 'rgba(255,255,255,0.6)';
+    rctx.font = `${Math.max(9, 11 * scale)}px Courier New`;
+    rctx.textAlign = 'center';
+    rctx.fillText(racers.find(r => r.id === id)?.name || '', sx, sy - 22 * scale);
+  });
+
+  // ── DRAW MY CAR ──
+  const [msx, msy, mscale] = worldToScreen(myState.x, myState.y, camX, camY, cw, ch);
+  drawCar(rctx, msx, msy, myState.angle, myColor, mscale);
+
+  // ── HUD ──
+  updateHUD();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CHECKPOINT LOGIC
+// ═══════════════════════════════════════════════════════════════════════════════
+function dist2(ax, ay, bx, by) { return (ax-bx)**2 + (ay-by)**2; }
+
+function checkCheckpoints() {
+  if (!currentTrack) return;
+  const wps = currentTrack.waypoints;
+  const nextCp = (myCheckpoint + 1) % wps.length;
+  const [tx, ty] = wps[nextCp];
+  if (dist2(myState.x, myState.y, tx, ty) < 60**2) {
+    if (nextCp === 0) {
+      // crossed start/finish
+      myLap++;
+      myCheckpoint = 0;
+    } else {
+      myCheckpoint = nextCp;
+    }
+    socket.emit('checkpoint', { checkpoint: myCheckpoint, laps: myLap });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  HUD / LEADERBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+function updateHUD() {
+  document.getElementById('lapDisplay').textContent = `LAP ${Math.min(myLap + 1, currentTrack?.laps || 1)} / ${currentTrack?.laps || 1}`;
+
+  // position
+  const myProg = (myLap * 1000) + myCheckpoint;
+  let pos = 1;
+  Object.entries(progress).forEach(([id]) => {
+    if (id === myId) return;
+    const theirProg = ((progress[id]?.laps || 0) * 1000) + (progress[id]?.checkpoint || 0);
+    if (theirProg > myProg) pos++;
+  });
+  document.getElementById('posDisplay').textContent = `P${pos} / ${racers.length}`;
+
+  // leaderboard
+  const sorted = racers.map(r => ({
+    ...r,
+    prog: ((progress[r.id]?.laps || 0) * 1000) + (progress[r.id]?.checkpoint || 0),
+    laps: progress[r.id]?.laps || 0
+  })).sort((a, b) => b.prog - a.prog);
+
+  const lbEl = document.getElementById('lbRows');
+  lbEl.innerHTML = sorted.map((r, i) =>
+    `<div class="lbRow">
+      <span class="lbPos">${i+1}</span>
+      <span class="lbName" style="color:${CAR_COLORS[r.id]||'#fff'}">${r.name}</span>
+      <span class="lbLap">L${r.laps}</span>
+    </div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  SOCKET.IO
+// ═══════════════════════════════════════════════════════════════════════════════
+const socket = io();
+
+socket.on('joined', ({ player, track, trackRotateIn }) => {
+  myId = player.id;
+  currentTrack = track;
+  CAR_COLORS[myId] = myColor;
+  updatePlayerInfo();
+  showScreen('lobbyScreen');
+  drawTrackPreview(track);
+  updateTrackUI(track, trackRotateIn);
+});
+
+socket.on('error', ({ msg }) => alert(msg));
+
+socket.on('lobbyUpdate', ({ players, readyIds, phase, track, trackRotateIn }) => {
+  currentTrack = track;
+  drawTrackPreview(track);
+  updateTrackUI(track, trackRotateIn);
+
+  const list = document.getElementById('playerList');
+  list.innerHTML = players.map(p => {
+    CAR_COLORS[p.id] = p.color;
+    const isReady = readyIds.includes(p.id);
+    return `<div class="playerRow ${isReady ? 'ready' : ''}">
+      <div class="carDot" style="background:${p.color}"></div>
+      <span class="playerName">${p.name}</span>
+      <span class="playerElo">${p.elo}</span>
+      ${isReady ? '<span class="readyBadge">READY</span>' : ''}
+    </div>`;
+  }).join('');
+  document.getElementById('lobbyCount').textContent = players.length;
+
+  const statusEl = document.getElementById('lobbyStatus');
+  if (phase === 'idle') statusEl.textContent = 'Waiting for players…';
+  else if (phase === 'waiting') statusEl.textContent = 'Race starting soon — ready up!';
+  else if (phase === 'countdown') statusEl.textContent = '';
+});
+
+socket.on('countdown', ({ secs }) => {
+  const cd = document.getElementById('countdownDisplay');
+  cd.style.display = 'block';
+  cd.textContent   = secs > 0 ? secs : 'GO!';
+  if (secs <= 0) setTimeout(() => { cd.style.display = 'none'; }, 600);
+});
+
+socket.on('trackRotated', ({ track, trackRotateIn }) => {
+  currentTrack = track;
+  drawTrackPreview(track);
+  updateTrackUI(track, trackRotateIn);
+});
+
+socket.on('raceStart', ({ track, racers: r }) => {
+  currentTrack = track;
+  racers = r;
+  racers.forEach(p => { CAR_COLORS[p.id] = p.color; progress[p.id] = { laps: 0, checkpoint: 0 }; });
+  raceActive = true;
+  myDNF = false;
+  myFinished = false;
+  myLap = 0;
+  myCheckpoint = 0;
+
+  // spawn position
+  const [sx, sy] = track.waypoints[0];
+  myState = { x: sx, y: sy + 40, angle: 0, speed: 0 };
+  Object.keys(carStates).forEach(k => delete carStates[k]);
+
+  resizeRaceCanvas();
+  showScreen('raceScreen');
+  document.getElementById('dnfBanner').style.display = 'none';
+  requestAnimationFrame(gameLoop);
+});
+
+socket.on('carUpdate', ({ id, x, y, angle, speed }) => {
+  carStates[id] = { x, y, angle, speed };
+});
+
+socket.on('progressUpdate', ({ id, laps, checkpoint }) => {
+  progress[id] = { laps, checkpoint };
+});
+
+socket.on('playerFinished', ({ id, pos }) => {
+  if (id === myId) { myFinished = true; }
+});
+
+socket.on('playerDNF', ({ id }) => {
+  if (id === myId) {
+    myDNF = true;
+    document.getElementById('dnfBanner').style.display = 'block';
+  }
+  delete carStates[id];
+});
+
+socket.on('raceOver', ({ summary }) => {
+  raceActive = false;
+  showResults(summary);
+});
+
+// ─── ROTATE TIMER ─────────────────────────────────────────────────────────────
+setInterval(() => {
+  const el = document.getElementById('rotateTimer');
+  if (!el) return;
+  const secs = Math.round((window._trackRotateIn || 0) / 1000);
+  el.textContent = `Track rotates in ${Math.floor(secs/60)}m ${secs%60}s`;
+  if (window._trackRotateIn > 0) window._trackRotateIn -= 1000;
+}, 1000);
+
+function updateTrackUI(track, rotateIn) {
+  window._trackRotateIn = rotateIn;
+  document.getElementById('trackName').textContent = track.name;
+  document.getElementById('trackName').style.color  = track.color;
+  document.getElementById('trackMeta').textContent  = `${track.laps} lap${track.laps>1?'s':''} · DNF after ${Math.round(track.dnfMs/1000)}s`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  RESULTS
+// ═══════════════════════════════════════════════════════════════════════════════
+function showResults(summary) {
+  const list = document.getElementById('resultsList');
+  list.innerHTML = summary.map(p => {
+    const delta = p.newElo - p.elo;
+    const sign = delta >= 0 ? '+' : '';
+    return `<div class="resultRow">
+      <span class="resultPos">${p.position}</span>
+      <div class="carDot" style="background:${p.color || '#888'}"></div>
+      <span class="resultName">${p.name}</span>
+      ${p.dnf ? '<span class="dnfTag">DNF</span>' : ''}
+      <span class="resultElo ${delta >= 0 ? 'eloUp' : 'eloDown'}">${sign}${delta} (${p.newElo})</span>
+    </div>`;
+  }).join('');
+  showScreen('resultsScreen');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('keydown', e => { keys[e.key] = true; e.preventDefault(); });
+window.addEventListener('keyup',   e => { keys[e.key] = false; });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  BUTTONS
+// ═══════════════════════════════════════════════════════════════════════════════
+document.getElementById('joinBtn').onclick = () => {
+  const name = document.getElementById('nameInput').value.trim() || 'Driver';
+  myName = name;
+  socket.emit('join', { name, color: myColor });
+};
+
+document.getElementById('readyBtn').onclick = () => {
+  socket.emit('ready');
+  document.getElementById('readyBtn').textContent = 'Waiting…';
+  document.getElementById('readyBtn').disabled = true;
+};
+
+document.getElementById('backLobbyBtn').onclick = () => {
+  document.getElementById('readyBtn').textContent = 'Ready Up';
+  document.getElementById('readyBtn').disabled = false;
+  showScreen('lobbyScreen');
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+buildColorPicker();
+</script>
+</body>
+</html>
